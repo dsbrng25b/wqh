@@ -3,15 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	"image/png"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/disintegration/imaging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
 const ENV_PREFIX = "WQH_"
+
+var useTesseract bool
 
 func main() {
 	newRootCmd().Execute()
@@ -30,10 +36,63 @@ func newRootCmd() *cobra.Command {
 			})
 		},
 	}
+	cmd.PersistentFlags().BoolVar(&useTesseract, "tesseract", false, "use tesseract")
 	cmd.AddCommand(
 		newRunCmd(),
 		newConvertCmd(),
+		newOptimizeCmd(),
 	)
+	return cmd
+}
+
+func newOptimizeCmd() *cobra.Command {
+	var (
+		saveFile string
+	)
+	cmd := &cobra.Command{
+		Use:     "optimize <pic>",
+		Short:   "optimizes picture for further processing",
+		Aliases: []string{"opt"},
+		Args:    cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var (
+				picture     io.Reader
+				err         error
+				pictureFile string    = args[0]
+				output      io.Writer = os.Stdout
+			)
+
+			// input
+			if pictureFile == "-" {
+				picture = os.Stdin
+			} else {
+				picture, err = os.Open(pictureFile)
+				if err != nil {
+					return err
+				}
+			}
+
+			// output
+			if saveFile != "" {
+				output, err = os.Create(saveFile)
+				if err != nil {
+					return err
+				}
+			}
+
+			img, _, err := image.Decode(picture)
+			if err != nil {
+				return err
+			}
+
+			img = imaging.Grayscale(img)
+			img = imaging.Sharpen(img, 2)
+			img = imaging.AdjustContrast(img, 20)
+
+			return png.Encode(output, img)
+		},
+	}
+	cmd.Flags().StringVar(&saveFile, "save", "", "save created output to file")
 	return cmd
 }
 
@@ -52,12 +111,15 @@ func newRunCmd() *cobra.Command {
 				err         error
 				pictureFile string    = args[0]
 				output      io.Writer = os.Stdout
+				text        string
 			)
 
 			// output
 			if saveFile != "" {
-				output, err := os.Create(saveFile)
-				output = io.MultiWriter(os.Stdout, save)
+				output, err = os.Create(saveFile)
+				if err != nil {
+					return err
+				}
 			}
 
 			// write header
@@ -84,7 +146,12 @@ func newRunCmd() *cobra.Command {
 
 			ctx := context.Background()
 
-			text, err := convert(ctx, picture)
+			if useTesseract {
+				text, err = convertTesseract(picture)
+			} else {
+				text, err = convert(ctx, picture)
+			}
+
 			if err != nil {
 				return err
 			}
@@ -107,6 +174,7 @@ func newConvertCmd() *cobra.Command {
 				picture     io.Reader
 				err         error
 				pictureFile string = args[0]
+				text        string
 			)
 
 			if pictureFile == "-" {
@@ -120,7 +188,11 @@ func newConvertCmd() *cobra.Command {
 
 			ctx := context.Background()
 
-			text, err := convert(ctx, picture)
+			if useTesseract {
+				text, err = convertTesseract(picture)
+			} else {
+				text, err = convert(ctx, picture)
+			}
 			if err != nil {
 				return err
 			}

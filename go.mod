@@ -4,7 +4,10 @@ go 1.13
 
 require (
 	cloud.google.com/go v0.46.3
+	github.com/disintegration/imaging v1.6.1
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
+	github.com/otiai10/gosseract v2.2.1+incompatible
+	github.com/otiai10/mint v1.3.0 // indirect
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
 	go.opencensus.io v0.22.1 // indirect
