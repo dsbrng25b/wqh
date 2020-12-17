@@ -1,4 +1,4 @@
-module github.com/dsbrng25b/wqh
+module github.com/dvob/wqh
 
 go 1.13
 
